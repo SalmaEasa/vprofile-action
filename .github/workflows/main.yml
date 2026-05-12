@@ -87,10 +87,6 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
       - name: login to ECR
         run: |
           kubectl create secret docker-registry regcred \
@@ -113,7 +109,5 @@ jobs:
           cluster-name: ${{ env.EKS_CLUSTER }}
           chart-path: ./helm/vprofilecharts
           namespace: default
-          values: |
-            appimage: ${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY }}
-            apptag: ${{ github.run_number }}
           name: vprofile-stack
+          helm-extra-args: --set appimage=${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY }} --set apptag=${{ github.run_number }}
