@@ -91,15 +91,13 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR image pull secret
+      - name: login to ECR
         run: |
-          ECR_REGISTRY=$(echo ${{ secrets.REGISTRY }} | cut -d'/' -f1)
           kubectl create secret docker-registry regcred \
-            --docker-server=$ECR_REGISTRY \
+            --docker-server=${{ secrets.REGISTRY }} \
             --docker-username=AWS \
-            --docker-password=${{ steps.login-ecr.outputs.docker_password_stdin }} \
-            --namespace=default \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --docker-password=$(aws ecr get-login-password)
+
 
       # - name: Install Helm
       #   uses: azure/setup-helm@v4
