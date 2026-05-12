@@ -30,10 +30,14 @@ jobs:
       - name: Checkstyle
         run: mvn checkstyle:checkstyle
 
+      - name: Set up JDK 17 for SonarQube
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+
       - name: Setup SonarQube
         uses: warchant/setup-sonar-scanner@v7
-        with:
-          version: 4.8.0.2856
 
       - name: Run SonarQube Scan
         run: sonar-scanner
