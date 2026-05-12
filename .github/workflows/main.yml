@@ -71,25 +71,51 @@ jobs:
           dockerfile: ./Dockerfile
           context: ./
 
-#   deploy:
-#     needs: build-and-publish
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v4
+  deploy:
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-#       - name: Configure AWS credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-#       - name: Update kubeconfig
-#         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
-#       - name: Deploy to EKS
-#         env:
-#           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}  # update if needed
-#           IMAGE_TAG: ${{ github.run_number }}
-#         run: |
-#           kubectl apply -f kubernetes/vpro-app/
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR image pull secret
+        run: |
+          ECR_REGISTRY=$(echo ${{ secrets.REGISTRY }} | cut -d'/' -f1)
+          kubectl create secret docker-registry regcred \
+            --docker-server=$ECR_REGISTRY \
+            --docker-username=AWS \
+            --docker-password=${{ steps.login-ecr.outputs.docker_password_stdin }} \
+            --namespace=default \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # - name: Install Helm
+      #   uses: azure/setup-helm@v4
+      #   with:
+      #     version: '3.12.0'
+
+      - name: Deploy to EKS with Helm
+        uses: bitovi/github-actions-deploy-eks-helm@v1.2.8
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          cluster-name: ${{ env.EKS_CLUSTER }}
+          chart-path: ./helm/vprofilecharts
+          namespace: default
+          values: |
+            appimage: ${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY }}
+            apptag: ${{ github.run_number }}
+          name: vprofile-stack
